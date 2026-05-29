@@ -2,6 +2,7 @@
   "name": "presence-monorepo",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@11.3.0",
   "scripts": {
     "build": "pnpm -r build",
     "start": "pnpm --filter @presence/server start",

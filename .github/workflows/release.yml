@@ -1,0 +1,115 @@
+name: Release
+
+# Publishes the extension to the VS Code Marketplace and the Open VSX Registry
+# (Cursor, VSCodium, …) whenever a version-bumped commit lands on main, and
+# cuts a matching GitHub Release with the .vsix attached.
+#
+# Trigger model: runs on every push to main, but only publishes when the
+# version in extension/package.json has no matching GitHub Release yet. So a
+# merge that doesn't bump the version is a no-op; bumping the version *is* the
+# release signal. workflow_dispatch allows a manual re-run.
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   VSCE_PAT  Azure DevOps PAT for the VS Code Marketplace publisher.
+#   OVSX_PAT  Open VSX access token for the EduardoAlba namespace.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Serialize releases so two pushes can't publish concurrently.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write # create the git tag + GitHub Release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Quality gates — a release never publishes a red build.
+      - name: Lint
+        run: pnpm lint
+
+      - name: Test
+        run: pnpm test
+
+      # @presence/protocol is bundled into the extension, and its dist/ is
+      # gitignored, so it must be built before packaging.
+      - name: Build protocol
+        run: pnpm --filter @presence/protocol build
+
+      - name: Determine version & release state
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(node -p "require('./extension/package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if gh release view "v$version" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::v$version is already released — nothing to publish."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::v$version has no release yet — packaging and publishing."
+          fi
+
+      - name: Package extension
+        if: steps.release.outputs.exists == 'false'
+        run: pnpm --filter presence-extension vsce:package
+
+      # Publishes are tolerant of an "already published" error so a partial
+      # failure (e.g. one registry succeeds, the other fails) can be re-run
+      # safely: the succeeded registry is treated as done, the failed one retries.
+      - name: Publish to VS Code Marketplace
+        if: steps.release.outputs.exists == 'false'
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          set +e
+          out=$(pnpm --filter presence-extension vsce:publish 2>&1); code=$?
+          echo "$out"
+          if [ $code -ne 0 ]; then
+            echo "$out" | grep -qiE "already (exists|published)" \
+              && { echo "::notice::Already on the VS Code Marketplace — treating as success."; exit 0; }
+            exit $code
+          fi
+
+      - name: Publish to Open VSX
+        if: steps.release.outputs.exists == 'false'
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: |
+          set +e
+          out=$(pnpm --filter presence-extension ovsx:publish 2>&1); code=$?
+          echo "$out"
+          if [ $code -ne 0 ]; then
+            echo "$out" | grep -qiE "already (exists|published)" \
+              && { echo "::notice::Already on Open VSX — treating as success."; exit 0; }
+            exit $code
+          fi
+
+      - name: Create GitHub Release
+        if: steps.release.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ steps.release.outputs.version }}" \
+            extension/presence.vsix \
+            --title "v${{ steps.release.outputs.version }}" \
+            --generate-notes
