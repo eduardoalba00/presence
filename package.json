@@ -12,7 +12,8 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "resync": "bash scripts/resync.sh"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
