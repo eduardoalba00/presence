@@ -2,3 +2,7 @@ packages:
   - protocol
   - server
   - extension
+allowBuilds:
+  '@vscode/vsce-sign': true
+  esbuild: true
+  keytar: true
