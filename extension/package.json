@@ -72,12 +72,17 @@
     "viewsWelcome": [
       {
         "view": "presence.roster",
-        "when": "presence.paused",
+        "when": "presence.accessDenied",
+        "contents": "Presence couldn't confirm that you currently have access to this repository, so it's disabled — you're not sharing your activity and can't see teammates.\n\nThis usually means your git credentials for the remote have expired or been revoked, or you're offline.\n[Retry](command:presence.retryAccess)"
+      },
+      {
+        "view": "presence.roster",
+        "when": "!presence.accessDenied && presence.paused",
         "contents": "Presence is paused — you're not sharing your activity.\n[Resume Presence](command:presence.resume)"
       },
       {
         "view": "presence.roster",
-        "when": "!presence.paused && !presence.connected",
+        "when": "!presence.accessDenied && !presence.paused && !presence.connected",
         "contents": "Connecting to the presence relay…\n\nWrong address?\n[Set Relay URL](command:presence.setServerUrl)"
       }
     ],
@@ -99,23 +104,34 @@
         "title": "Resume Presence",
         "category": "Presence",
         "icon": "$(debug-start)"
+      },
+      {
+        "command": "presence.retryAccess",
+        "title": "Retry Repository Access Check",
+        "category": "Presence",
+        "icon": "$(refresh)"
       }
     ],
     "menus": {
       "view/title": [
         {
+          "command": "presence.retryAccess",
+          "when": "view == presence.roster && presence.accessDenied",
+          "group": "navigation@0"
+        },
+        {
           "command": "presence.pause",
-          "when": "view == presence.roster && !presence.paused",
+          "when": "view == presence.roster && !presence.accessDenied && !presence.paused",
           "group": "navigation@1"
         },
         {
           "command": "presence.resume",
-          "when": "view == presence.roster && presence.paused",
+          "when": "view == presence.roster && !presence.accessDenied && presence.paused",
           "group": "navigation@1"
         },
         {
           "command": "presence.setServerUrl",
-          "when": "view == presence.roster",
+          "when": "view == presence.roster && !presence.accessDenied",
           "group": "navigation@2"
         }
       ]

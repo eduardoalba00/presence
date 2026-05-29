@@ -8,6 +8,7 @@ export class StatusBar implements vscode.Disposable {
   private state: ConnectionState = "connecting";
   private online = 0;
   private paused = false;
+  private accessDenied = false;
 
   constructor(private url: string) {
     this.item = vscode.window.createStatusBarItem(
@@ -35,6 +36,12 @@ export class StatusBar implements vscode.Disposable {
     this.render();
   }
 
+  /** Reflect that repo access could not be confirmed; clears on a granted retry. */
+  setAccessDenied(denied: boolean): void {
+    this.accessDenied = denied;
+    this.render();
+  }
+
   setUrl(url: string): void {
     this.url = url;
     this.render();
@@ -42,6 +49,15 @@ export class StatusBar implements vscode.Disposable {
 
   private render(): void {
     const item = this.item;
+    if (this.accessDenied) {
+      item.text = `$(error) Presence: no repo access`;
+      item.backgroundColor = new vscode.ThemeColor(
+        "statusBarItem.errorBackground",
+      );
+      item.tooltip =
+        "Couldn't confirm you have access to this repository — Presence is disabled.";
+      return;
+    }
     if (this.paused) {
       item.text = `$(debug-pause) Presence: paused`;
       item.backgroundColor = undefined;

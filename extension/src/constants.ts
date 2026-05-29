@@ -34,7 +34,10 @@ export const OPEN_DIFF_COMMAND = "presence.openDiff";
 export const PAUSE_COMMAND = "presence.pause";
 export const RESUME_COMMAND = "presence.resume";
 export const SET_URL_COMMAND = "presence.setServerUrl";
+export const RETRY_ACCESS_COMMAND = "presence.retryAccess";
 
 /** Context keys driving the view's welcome content and title buttons. */
 export const PAUSED_CONTEXT = "presence.paused";
 export const CONNECTED_CONTEXT = "presence.connected";
+/** True when the user could not be confirmed to have access to the repo. */
+export const ACCESS_DENIED_CONTEXT = "presence.accessDenied";
