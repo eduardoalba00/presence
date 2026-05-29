@@ -1,0 +1,10 @@
+{
+  "name": "presence-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "pnpm -r build",
+    "start": "pnpm --filter @presence/server start",
+    "start:server": "pnpm --filter @presence/server start"
+  }
+}

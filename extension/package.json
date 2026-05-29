@@ -1,0 +1,62 @@
+{
+  "name": "presence-extension",
+  "displayName": "Presence",
+  "description": "See which file each teammate currently has open.",
+  "version": "0.1.0",
+  "publisher": "presence",
+  "private": true,
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Presence",
+      "properties": {
+        "presence.serverUrl": {
+          "type": "string",
+          "default": "ws://localhost:8080",
+          "description": "WebSocket URL of the presence relay server."
+        },
+        "presence.userName": {
+          "type": "string",
+          "default": "",
+          "description": "Display name shown to teammates. If empty, you'll be prompted on first activation."
+        }
+      }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "presence",
+          "title": "Presence",
+          "icon": "media/presence.svg"
+        }
+      ]
+    },
+    "views": {
+      "presence": [
+        {
+          "id": "presence.roster",
+          "name": "Teammates"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "tsc -p .",
+    "watch": "tsc -p . --watch",
+    "vscode:prepublish": "tsc -p ."
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.85.0",
+    "@types/ws": "^8.5.12",
+    "typescript": "^5.6.0"
+  }
+}
