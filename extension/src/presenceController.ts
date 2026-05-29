@@ -1,15 +1,22 @@
 import * as vscode from "vscode";
 import type { DiffEntry, User } from "@presence/protocol";
 import {
+  ACCESS_DENIED_CONTEXT,
   CONNECTED_CONTEXT,
   DIFF_SCHEME,
   PAUSE_COMMAND,
   PAUSED_CONTEXT,
   RESUME_COMMAND,
+  RETRY_ACCESS_COMMAND,
   ROSTER_VIEW_ID,
   SET_URL_COMMAND,
 } from "./constants";
-import { affectsServerUrl, getServerUrl, setServerUrl } from "./config";
+import {
+  affectsServerUrl,
+  getServerUrl,
+  setServerUrl,
+  verifyRepoAccess,
+} from "./config";
 import { ActivityTracker } from "./activityTracker";
 import { PresenceClient, type ConnectionState } from "./presenceClient";
 import { DiffWatcher } from "./git/diffWatcher";
@@ -51,6 +58,7 @@ export class PresenceController implements vscode.Disposable {
   private users: User[] = [];
   private collisions = new Set<string>();
   private paused: boolean;
+  private accessDenied = false;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -88,7 +96,26 @@ export class PresenceController implements vscode.Disposable {
   }
 
   /** Begin reporting our own presence (unless we're paused from a prior session). */
-  start(): void {
+  async start(): Promise<void> {
+    // Gate on current repo access before doing anything that joins the room or
+    // reads the working tree. Fail-closed: if we can't confirm access, we never
+    // connect, so a stale clone on a revoked account can't surface in the pool.
+    this.treeView.message = "Verifying repository access…";
+    const access = await verifyRepoAccess(this.session.folder);
+    if (!access.granted) {
+      this.log.appendLine(
+        `[presence] repo access denied: ${access.reason ?? "unknown"}`,
+      );
+      this.applyAccessDeniedUi();
+      return;
+    }
+    this.treeView.message = undefined;
+    void vscode.commands.executeCommand(
+      "setContext",
+      ACCESS_DENIED_CONTEXT,
+      false,
+    );
+
     // Always seed local state + watchers; the client buffers updates and only
     // sends them while connected, so this is safe even when paused.
     const file = relativeFileOf(vscode.window.activeTextEditor);
@@ -144,6 +171,33 @@ export class PresenceController implements vscode.Disposable {
     void vscode.commands.executeCommand("setContext", CONNECTED_CONTEXT, false);
   }
 
+  /** Reflect that repo access couldn't be confirmed; nothing has joined the room. */
+  private applyAccessDeniedUi(): void {
+    this.accessDenied = true;
+    this.users = [];
+    this.collisions = new Set();
+    this.provider.setRoster([]);
+    this.provider.setDiffs(new Map());
+    this.explorerDecorations.setRoster([]);
+    this.statusBar.setAccessDenied(true);
+    this.treeView.message = undefined; // the welcome view explains the state
+    void vscode.commands.executeCommand(
+      "setContext",
+      ACCESS_DENIED_CONTEXT,
+      true,
+    );
+    void vscode.commands.executeCommand("setContext", CONNECTED_CONTEXT, false);
+    void vscode.commands.executeCommand("setContext", PAUSED_CONTEXT, false);
+  }
+
+  /** Re-run the access check (e.g. after the user reconnects to the VPN). */
+  private async retryAccess(): Promise<void> {
+    if (!this.accessDenied) return;
+    this.accessDenied = false;
+    this.statusBar.setAccessDenied(false);
+    await this.start();
+  }
+
   /** Prompt for a relay URL and persist it; the change triggers a reconnect. */
   private async promptForServerUrl(): Promise<void> {
     const url = await vscode.window.showInputBox({
@@ -180,6 +234,9 @@ export class PresenceController implements vscode.Disposable {
       registerOpenDiffCommand(),
       vscode.commands.registerCommand(PAUSE_COMMAND, () => this.pause()),
       vscode.commands.registerCommand(RESUME_COMMAND, () => this.resume()),
+      vscode.commands.registerCommand(RETRY_ACCESS_COMMAND, () =>
+        this.retryAccess(),
+      ),
       vscode.commands.registerCommand(SET_URL_COMMAND, () =>
         this.promptForServerUrl(),
       ),

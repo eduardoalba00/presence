@@ -25,7 +25,7 @@ export async function activate(
     );
 
     controller = new PresenceController(context, session, log);
-    controller.start();
+    await controller.start();
     log.appendLine("[presence] started");
   } catch (err) {
     const detail =

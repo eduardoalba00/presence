@@ -4,6 +4,19 @@ See which file each teammate currently has open — and peek at their uncommitte
 changes — right inside VS Code. **Presence only:** no code syncing, no edits to
 your files, no cursor positions. Just shared awareness of who's where.
 
+## Install
+
+- **VS Code** — install from the
+  [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=EduardoAlba.presence-extension),
+  or search "Presence" in the Extensions view.
+- **Cursor, VSCodium, Gitpod, and other VS Code–compatible editors** — install
+  from the [Open VSX Registry](https://open-vsx.org/extension/EduardoAlba/presence-extension),
+  or search "Presence" in the editor's Extensions view (these editors pull from
+  Open VSX).
+- **Manual** — download the `.vsix` from the
+  [GitHub releases](https://github.com/eduardoalba00/presence/releases) and run
+  **Extensions: Install from VSIX…** from the Command Palette.
+
 ## Features
 
 - **Teammates view** — every connected teammate shown with a colored initials

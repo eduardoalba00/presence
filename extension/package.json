@@ -2,7 +2,7 @@
   "name": "presence-extension",
   "displayName": "Presence",
   "description": "See which file each teammate currently has open, with shared read-only diffs.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "EduardoAlba",
   "private": true,
   "license": "MIT",
@@ -72,12 +72,17 @@
     "viewsWelcome": [
       {
         "view": "presence.roster",
-        "when": "presence.paused",
+        "when": "presence.accessDenied",
+        "contents": "Presence couldn't confirm that you currently have access to this repository, so it's disabled — you're not sharing your activity and can't see teammates.\n\nThis usually means your git credentials for the remote have expired or been revoked, or you're offline.\n[Retry](command:presence.retryAccess)"
+      },
+      {
+        "view": "presence.roster",
+        "when": "!presence.accessDenied && presence.paused",
         "contents": "Presence is paused — you're not sharing your activity.\n[Resume Presence](command:presence.resume)"
       },
       {
         "view": "presence.roster",
-        "when": "!presence.paused && !presence.connected",
+        "when": "!presence.accessDenied && !presence.paused && !presence.connected",
         "contents": "Connecting to the presence relay…\n\nWrong address?\n[Set Relay URL](command:presence.setServerUrl)"
       }
     ],
@@ -99,23 +104,34 @@
         "title": "Resume Presence",
         "category": "Presence",
         "icon": "$(debug-start)"
+      },
+      {
+        "command": "presence.retryAccess",
+        "title": "Retry Repository Access Check",
+        "category": "Presence",
+        "icon": "$(refresh)"
       }
     ],
     "menus": {
       "view/title": [
         {
+          "command": "presence.retryAccess",
+          "when": "view == presence.roster && presence.accessDenied",
+          "group": "navigation@0"
+        },
+        {
           "command": "presence.pause",
-          "when": "view == presence.roster && !presence.paused",
+          "when": "view == presence.roster && !presence.accessDenied && !presence.paused",
           "group": "navigation@1"
         },
         {
           "command": "presence.resume",
-          "when": "view == presence.roster && presence.paused",
+          "when": "view == presence.roster && !presence.accessDenied && presence.paused",
           "group": "navigation@1"
         },
         {
           "command": "presence.setServerUrl",
-          "when": "view == presence.roster",
+          "when": "view == presence.roster && !presence.accessDenied",
           "group": "navigation@2"
         }
       ]
@@ -126,7 +142,9 @@
     "watch": "node esbuild.js --watch",
     "check-types": "tsc --noEmit -p .",
     "package": "npm run check-types && node esbuild.js --production",
-    "vsce:package": "vsce package --no-dependencies",
+    "vsce:package": "vsce package --no-dependencies -o presence.vsix",
+    "vsce:publish": "vsce publish --packagePath presence.vsix",
+    "ovsx:publish": "ovsx publish presence.vsix",
     "vscode:prepublish": "npm run package"
   },
   "devDependencies": {
@@ -136,6 +154,7 @@
     "@types/ws": "^8.5.12",
     "@vscode/vsce": "^3.2.1",
     "esbuild": "^0.24.2",
+    "ovsx": "^0.10.1",
     "typescript": "^5.6.0",
     "ws": "^8.18.0"
   }
