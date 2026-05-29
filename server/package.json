@@ -5,11 +5,12 @@
   "description": "Dumb WebSocket relay for file-level presence.",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc -p .",
-    "start": "tsc -p . && node dist/index.js",
-    "dev": "tsc -p . --watch"
+    "build": "tsc -b",
+    "start": "tsc -b && node dist/index.js",
+    "dev": "tsc -b --watch"
   },
   "dependencies": {
+    "@presence/protocol": "workspace:*",
     "ws": "^8.18.0"
   },
   "devDependencies": {

@@ -5,12 +5,16 @@ every other teammate currently has open — nothing more. **This is presence
 only:** no code syncing, no edits, no cursor positions. Just "who is on what
 file."
 
-The project is a pnpm monorepo with two packages:
+The project is a pnpm monorepo with three packages:
 
-| Package      | What it is                                              |
-| ------------ | ------------------------------------------------------- |
-| `server/`    | A dumb Node WebSocket relay (`ws`). Stores + echoes.    |
-| `extension/` | A VS Code extension (TypeScript) that shows the roster. |
+| Package      | What it is                                                         |
+| ------------ | ------------------------------------------------------------------ |
+| `protocol/`  | `@presence/protocol` — the shared WebSocket wire contract (types). |
+| `server/`    | A dumb Node WebSocket relay (`ws`). Stores + echoes.               |
+| `extension/` | A VS Code extension (TypeScript) that shows the roster.            |
+
+`server` and `extension` both depend on `@presence/protocol` (via TypeScript
+project references), so the message types are defined exactly once.
 
 ## How it works
 
@@ -20,8 +24,43 @@ The project is a pnpm monorepo with two packages:
 2. Whenever you switch the active editor, it sends an `update` with the file
    path **relative to the workspace root** (never an absolute path).
 3. The relay keeps an in-memory roster per room and broadcasts it to everyone
-   **in the same room** after any change. The extension renders it in a sidebar
-   TreeView.
+   **in the same room** after any change. The extension renders it two ways:
+   - a sidebar **Teammates** TreeView — each person shown with a colored
+     initials avatar carrying a **presence dot** (green active / amber idle),
+     their **git branch** and current file (`branch • filename · folder`), and
+     `(you)` on your own entry. Click a teammate to jump to their file. Expand a
+     teammate to see their **uncommitted changes**; click a changed file to open
+     it in VS Code's **read-only diff editor** (working tree vs `HEAD`, including
+     untracked/staged — same as your own Source Control view), with native
+     file-type icons and `M`/`A`/`U`/`D` status letters.
+   - **Explorer file decorations** — any file a teammate has open gets a
+     2-letter initials badge and a colored tint; hover lists who's there.
+
+Extra niceties:
+
+- **Connection status** — a status-bar item (`Presence: N online` /
+  `connecting…` / `reconnecting…`) and an in-view message reflect the live
+  connection state, so you're never guessing whether you're disconnected or
+  just alone.
+- **Same-file collision** — when a teammate is editing the exact file you have
+  open, their row turns red with a `!` badge and you get a heads-up toast.
+- **Pause presence** — the Teammates view title has a pause/resume button (and
+  `Presence: Pause/Resume` commands). Pausing disconnects you from the relay, so
+  teammates stop seeing you and your shared diff; the choice persists across
+  sessions until you resume.
+- **Set Relay URL** — a button in the Teammates view title opens an input to
+  point at a different relay on the fly (same as editing `presence.serverUrl`);
+  the client reconnects immediately.
+
+The diff/branch sharing uses the built-in Git extension API; if the workspace
+isn't a git repo, those parts are simply inactive (presence still works).
+
+### Secure connections
+
+The server URL setting accepts `wss://`, so you can put the relay behind TLS
+(e.g. an `ngrok` https tunnel or a reverse proxy) and point
+`presence.serverUrl` at the `wss://…` address. The relay itself speaks plain
+`ws` — terminate TLS at the tunnel/proxy in front of it.
 
 Only people whose workspace resolves to the same room id see each other — so
 two people who open the same git repo land in the same room automatically.
@@ -30,14 +69,29 @@ two people who open the same git repo land in the same room automatically.
 
 ```
 client -> server: { type: "hello",  name: string, room: string, id?: string }
-client -> server: { type: "update", file: string }
-server -> client: { type: "roster", users: { id, name, file }[] }
+client -> server: { type: "update", file?, branch?, status? }   // partial; merged
+client -> server: { type: "diff",   files: DiffFile[] }
+server -> client: { type: "roster", users: User[] }
+server -> client: { type: "diffs",  entries: { id, files: DiffFile[] }[] }
+
+User     = { id, name, file, branch, status: "active"|"idle" }
+DiffFile = { path, status: "added"|"modified"|"deleted"|"untracked"|"binary"|"large",
+             before, after }   // before = HEAD content, after = working content
 ```
+
+`update` is a partial: the server merges whichever of `file`/`branch`/`status`
+are present, leaving the rest untouched.
 
 The client supplies its own `id` in `hello` so it can recognize itself in the
 roster (used to mark the `(you)` entry) regardless of display name; if omitted,
 the server assigns one. Matching on `id` instead of `name` means two teammates
 sharing a display name are still distinguished.
+
+The `diff`/`diffs` pair is an independent stream from the roster (diffs change
+on a debounced cadence, file switches are instant). The relay treats `DiffFile`
+as opaque — it only stores and echoes. `before`/`after` carry both sides of each
+change so a teammate's diff can render in your editor without you having their
+files.
 
 ## Prerequisites
 
@@ -91,10 +145,10 @@ teammate's `presence.serverUrl`.
 
 ### Settings
 
-| Setting               | Default                | Description                                                              |
-| --------------------- | ---------------------- | ------------------------------------------------------------------------ |
-| `presence.serverUrl`  | `ws://localhost:8080`  | WebSocket URL of the relay.                                              |
-| `presence.userName`   | _(empty)_              | Your display name. If empty on first activation, you're prompted for it. |
+| Setting              | Default               | Description                                                              |
+| -------------------- | --------------------- | ------------------------------------------------------------------------ |
+| `presence.serverUrl` | `ws://localhost:8080` | WebSocket URL of the relay.                                              |
+| `presence.userName`  | _(empty)_             | Your display name. If empty on first activation, you're prompted for it. |
 
 If `presence.userName` is empty and you dismiss the prompt, the extension falls
 back to your OS username.
@@ -135,16 +189,25 @@ the same repo and point at the same server**.
 
 ```
 presence/
-├── package.json          # workspace scripts (build, start)
+├── package.json              # workspace scripts (build, start)
 ├── pnpm-workspace.yaml
+├── protocol/
+│   └── src/index.ts          # the shared wire contract (User, DiffFile, messages)
 ├── server/
-│   ├── src/index.ts      # the relay: rooms, roster broadcast, heartbeat
-│   └── package.json
+│   └── src/index.ts          # the relay: rooms, roster/diff broadcast, heartbeat
 └── extension/
-    ├── src/extension.ts  # ws client, reconnect, TreeView roster
     ├── media/presence.svg
-    ├── .vscode/          # launch.json (F5) + tasks.json (build)
-    └── package.json
+    ├── .vscode/              # launch.json (F5) + tasks.json (build)
+    └── src/
+        ├── extension.ts      # activate/deactivate (thin entry point)
+        ├── presenceController.ts  # composition root: wires everything together
+        ├── presenceClient.ts # WebSocket client + reconnect/backoff
+        ├── activityTracker.ts# active/idle detection
+        ├── config.ts         # settings: server url, display name, room id
+        ├── constants.ts      # schemes, limits, command/view ids
+        ├── git/              # Git API surface + working-tree diff watcher
+        ├── ui/               # tree provider, avatars, status bar, diff viewer, decorations
+        └── util/             # path + text helpers
 ```
 
 ## Resilience

@@ -1,0 +1,16 @@
+# Everything is bundled into dist/extension.js, so ship only that + assets.
+.vscode/**
+node_modules/**
+src/**
+**/*.ts
+**/*.map
+**/tsconfig*.json
+**/tsconfig.tsbuildinfo
+esbuild.js
+.gitignore
+.eslintrc*
+**/*.vsix
+media/icon.svg
+
+# Keep: dist/extension.js, package.json, README.md, LICENSE, media/icon.png,
+# media/presence.svg (activity-bar icon, referenced at runtime).

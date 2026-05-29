@@ -1,0 +1,19 @@
+// @ts-check
+import js from "@eslint/js";
+import tseslint from "typescript-eslint";
+import eslintConfigPrettier from "eslint-config-prettier";
+import globals from "globals";
+import { defineConfig, globalIgnores } from "eslint/config";
+
+export default defineConfig([
+  globalIgnores(["**/dist/**", "**/node_modules/**", "**/*.tsbuildinfo"]),
+  {
+    files: ["**/*.ts"],
+    extends: [js.configs.recommended, tseslint.configs.recommended],
+    languageOptions: {
+      globals: { ...globals.node },
+    },
+  },
+  // Must be last: turns off ESLint rules that conflict with Prettier.
+  eslintConfigPrettier,
+]);

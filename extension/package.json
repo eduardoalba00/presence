@@ -1,15 +1,40 @@
 {
   "name": "presence-extension",
   "displayName": "Presence",
-  "description": "See which file each teammate currently has open.",
+  "description": "See which file each teammate currently has open, with shared read-only diffs.",
   "version": "0.1.0",
-  "publisher": "presence",
+  "publisher": "EduardoAlba",
   "private": true,
+  "license": "MIT",
+  "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eduardoalba00/presence.git",
+    "directory": "extension"
+  },
+  "bugs": {
+    "url": "https://github.com/eduardoalba00/presence/issues"
+  },
+  "homepage": "https://github.com/eduardoalba00/presence#readme",
   "engines": {
     "vscode": "^1.85.0"
   },
-  "categories": ["Other"],
-  "activationEvents": ["onStartupFinished"],
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "presence",
+    "collaboration",
+    "team",
+    "pair programming",
+    "awareness",
+    "git",
+    "diff",
+    "remote"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "configuration": {
@@ -43,20 +68,75 @@
           "name": "Teammates"
         }
       ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "presence.roster",
+        "when": "presence.paused",
+        "contents": "Presence is paused — you're not sharing your activity.\n[Resume Presence](command:presence.resume)"
+      },
+      {
+        "view": "presence.roster",
+        "when": "!presence.paused && !presence.connected",
+        "contents": "Connecting to the presence relay…\n\nWrong address?\n[Set Relay URL](command:presence.setServerUrl)"
+      }
+    ],
+    "commands": [
+      {
+        "command": "presence.setServerUrl",
+        "title": "Set Relay URL…",
+        "category": "Presence",
+        "icon": "$(link)"
+      },
+      {
+        "command": "presence.pause",
+        "title": "Pause Presence",
+        "category": "Presence",
+        "icon": "$(debug-pause)"
+      },
+      {
+        "command": "presence.resume",
+        "title": "Resume Presence",
+        "category": "Presence",
+        "icon": "$(debug-start)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "presence.pause",
+          "when": "view == presence.roster && !presence.paused",
+          "group": "navigation@1"
+        },
+        {
+          "command": "presence.resume",
+          "when": "view == presence.roster && presence.paused",
+          "group": "navigation@1"
+        },
+        {
+          "command": "presence.setServerUrl",
+          "when": "view == presence.roster",
+          "group": "navigation@2"
+        }
+      ]
     }
   },
   "scripts": {
-    "build": "tsc -p .",
-    "watch": "tsc -p . --watch",
-    "vscode:prepublish": "tsc -p ."
-  },
-  "dependencies": {
-    "ws": "^8.18.0"
+    "build": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "check-types": "tsc --noEmit -p .",
+    "package": "npm run check-types && node esbuild.js --production",
+    "vsce:package": "vsce package --no-dependencies",
+    "vscode:prepublish": "npm run package"
   },
   "devDependencies": {
+    "@presence/protocol": "workspace:*",
     "@types/node": "^22.0.0",
     "@types/vscode": "^1.85.0",
     "@types/ws": "^8.5.12",
-    "typescript": "^5.6.0"
+    "@vscode/vsce": "^3.2.1",
+    "esbuild": "^0.24.2",
+    "typescript": "^5.6.0",
+    "ws": "^8.18.0"
   }
 }

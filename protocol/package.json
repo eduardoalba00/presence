@@ -1,0 +1,14 @@
+{
+  "name": "@presence/protocol",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared WebSocket wire contract between the presence relay and the VS Code extension.",
+  "main": "dist/index.js",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "tsc -p ."
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

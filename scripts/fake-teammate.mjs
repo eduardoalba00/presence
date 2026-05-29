@@ -22,7 +22,7 @@ import { createRequire } from "node:module";
 // Reuse the `ws` already installed in the server package.
 const require = createRequire(import.meta.url);
 const WebSocket = require(
-  path.join(import.meta.dirname, "..", "server", "node_modules", "ws")
+  path.join(import.meta.dirname, "..", "server", "node_modules", "ws"),
 );
 
 const repoPath = process.argv[2];
@@ -30,21 +30,28 @@ const name = process.argv[3] || "Robot";
 const fixedFile = process.argv[4];
 
 if (!repoPath) {
-  console.error("usage: node scripts/fake-teammate.mjs <repo-path> [name] [file]");
+  console.error(
+    "usage: node scripts/fake-teammate.mjs <repo-path> [name] [file]",
+  );
   process.exit(1);
 }
 
 const url =
   process.env.SERVER_URL || `ws://localhost:${process.env.PORT || 8080}`;
 
-const shortHash = (v) => createHash("sha1").update(v).digest("hex").slice(0, 12);
+const shortHash = (v) =>
+  createHash("sha1").update(v).digest("hex").slice(0, 12);
 
 function resolveRoomId(repo) {
   try {
-    const remote = execFileSync("git", ["config", "--get", "remote.origin.url"], {
-      cwd: repo,
-      stdio: ["ignore", "pipe", "ignore"],
-    })
+    const remote = execFileSync(
+      "git",
+      ["config", "--get", "remote.origin.url"],
+      {
+        cwd: repo,
+        stdio: ["ignore", "pipe", "ignore"],
+      },
+    )
       .toString()
       .trim();
     if (remote) return shortHash(remote);
@@ -81,7 +88,7 @@ ws.on("message", (raw) => {
   if (msg.type === "roster") {
     console.log(
       "<- roster:",
-      msg.users.map((u) => `${u.name}:${u.file || "-"}`).join(", ")
+      msg.users.map((u) => `${u.name}:${u.file || "-"}`).join(", "),
     );
   }
 });
