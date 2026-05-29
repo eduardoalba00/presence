@@ -27,6 +27,27 @@ const diffs = new Map<string, Map<string, DiffFile[]>>();
 
 const wss = new WebSocketServer({ port: PORT });
 
+/**
+ * Timestamped console line. We log lifecycle events (connects, joins, leaves,
+ * room churn) and a bare signal that updates/diffs arrived — never their
+ * contents (file paths, branches, diff bodies), keeping the relay's
+ * in-memory, low-PII posture intact.
+ */
+function log(msg: string): void {
+  console.log(`${new Date().toISOString()} ${msg}`);
+}
+
+/**
+ * Human-friendly label for a connection: the user's display name (with the id
+ * in parens to disambiguate) once we've seen their `hello`, otherwise the bare
+ * id. Names come from the roster, so this only resolves while the user is still
+ * a member of the room — capture it before removing them on disconnect.
+ */
+function label(conn: Conn): string {
+  const name = conn.roomId && rooms.get(conn.roomId)?.get(conn.id)?.name;
+  return name ? `${name} (${conn.id})` : conn.id;
+}
+
 /** Send `data` to every open socket in `roomId`. */
 function sendToRoom(roomId: string, data: string): void {
   for (const client of wss.clients) {
@@ -59,6 +80,7 @@ wss.on("connection", (socket) => {
   const conn = socket as Conn;
   conn.id = randomUUID();
   conn.isAlive = true;
+  log(`connection opened (${conn.id})`);
 
   conn.on("pong", () => {
     conn.isAlive = true;
@@ -69,6 +91,7 @@ wss.on("connection", (socket) => {
     try {
       msg = JSON.parse(raw.toString());
     } catch {
+      log(`dropped malformed frame from ${conn.id}`);
       return; // ignore malformed frames
     }
 
@@ -81,7 +104,9 @@ wss.on("connection", (socket) => {
       if (!room) {
         room = new Map();
         rooms.set(msg.room, room);
+        log(`room created (${msg.room})`);
       }
+      log(`${msg.name} (${conn.id}) joined room ${msg.room}`);
       room.set(conn.id, {
         id: conn.id,
         name: msg.name,
@@ -102,6 +127,7 @@ wss.on("connection", (socket) => {
         if (msg.status === "active" || msg.status === "idle") {
           user.status = msg.status;
         }
+        log(`update from ${label(conn)} in ${conn.roomId}`);
         broadcast(conn.roomId);
       }
     } else if (msg.type === "diff") {
@@ -111,18 +137,26 @@ wss.on("connection", (socket) => {
         room = new Map();
         diffs.set(conn.roomId, room);
       }
-      room.set(conn.id, Array.isArray(msg.files) ? msg.files : []);
+      const files = Array.isArray(msg.files) ? msg.files : [];
+      room.set(conn.id, files);
+      log(`diff from ${label(conn)} in ${conn.roomId} (${files.length} files)`);
       broadcastDiffs(conn.roomId);
     }
   });
 
   conn.on("close", () => {
+    // Resolve the name before we remove the user from the roster below.
+    const who = label(conn);
+    log(`connection closed (${who})`);
     if (!conn.roomId) return;
     const room = rooms.get(conn.roomId);
     if (room) {
       room.delete(conn.id);
-      if (room.size === 0) rooms.delete(conn.roomId);
-      else broadcast(conn.roomId);
+      log(`${who} left room ${conn.roomId}`);
+      if (room.size === 0) {
+        rooms.delete(conn.roomId);
+        log(`room emptied (${conn.roomId})`);
+      } else broadcast(conn.roomId);
     }
     const diffRoom = diffs.get(conn.roomId);
     if (diffRoom?.delete(conn.id)) {
@@ -143,6 +177,7 @@ const heartbeat = setInterval(() => {
   for (const client of wss.clients) {
     const c = client as Conn;
     if (!c.isAlive) {
+      log(`terminating unresponsive connection (${label(c)})`);
       c.terminate();
       continue;
     }
