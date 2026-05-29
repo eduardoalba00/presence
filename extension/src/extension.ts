@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as os from "node:os";
 import { execFile } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import WebSocket from "ws";
 
 /** A teammate as reported by the relay roster. */
@@ -31,6 +31,7 @@ class PresenceClient {
 
   constructor(
     private readonly url: string,
+    private readonly id: string,
     private readonly name: string,
     private readonly room: string,
     private readonly onRoster: (users: User[]) => void
@@ -64,7 +65,7 @@ class PresenceClient {
     ws.on("open", () => {
       this.attempt = 0;
       // Re-announce ourselves and our current file on every (re)connect.
-      this.send({ type: "hello", name: this.name, room: this.room });
+      this.send({ type: "hello", id: this.id, name: this.name, room: this.room });
       this.send({ type: "update", file: this.currentFile });
     });
 
@@ -112,20 +113,20 @@ class RosterProvider implements vscode.TreeDataProvider<User> {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<void>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
-  constructor(private readonly myName: string) {}
+  constructor(private readonly myId: string) {}
 
   setRoster(users: User[]): void {
     // Sort for a stable display: yourself first, then alphabetical.
     this.users = [...users].sort((a, b) => {
-      const am = a.name === this.myName ? 0 : 1;
-      const bm = b.name === this.myName ? 0 : 1;
+      const am = a.id === this.myId ? 0 : 1;
+      const bm = b.id === this.myId ? 0 : 1;
       return am - bm || a.name.localeCompare(b.name);
     });
     this._onDidChangeTreeData.fire();
   }
 
   getTreeItem(user: User): vscode.TreeItem {
-    const isMe = user.name === this.myName;
+    const isMe = user.id === this.myId;
     const item = new vscode.TreeItem(isMe ? `${user.name} (you)` : user.name);
     item.description = user.file || "—";
     item.tooltip = `${user.name} — ${user.file || "no file open"}`;
@@ -154,13 +155,13 @@ class PresenceDecorationProvider implements vscode.FileDecorationProvider {
 
   constructor(
     private readonly folder: vscode.WorkspaceFolder | undefined,
-    private readonly myName: string
+    private readonly myId: string
   ) {}
 
   setRoster(users: User[]): void {
     const next = new Map<string, string[]>();
     for (const u of users) {
-      if (!u.file || u.name === this.myName) continue; // skip empty + yourself
+      if (!u.file || u.id === this.myId) continue; // skip empty + yourself
       const key = normalizePath(u.file);
       const names = next.get(key) ?? [];
       names.push(u.name);
@@ -267,15 +268,16 @@ export async function activate(
 
   const name = await resolveName();
   const room = await resolveRoomId(folder);
+  const id = randomUUID(); // unique per session; how we recognize ourselves
 
-  const provider = new RosterProvider(name);
-  const decorations = new PresenceDecorationProvider(folder, name);
+  const provider = new RosterProvider(id);
+  const decorations = new PresenceDecorationProvider(folder, id);
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider("presence.roster", provider),
     vscode.window.registerFileDecorationProvider(decorations)
   );
 
-  client = new PresenceClient(url, name, room, (users) => {
+  client = new PresenceClient(url, id, name, room, (users) => {
     provider.setRoster(users);
     decorations.setRoster(users);
   });

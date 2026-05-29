@@ -11,7 +11,7 @@ interface User {
 
 /** Messages the relay accepts from clients. */
 type ClientMessage =
-  | { type: "hello"; name: string; room: string }
+  | { type: "hello"; name: string; room: string; id?: string }
   | { type: "update"; file: string };
 
 /** Messages the relay sends to clients. */
@@ -67,6 +67,9 @@ wss.on("connection", (socket) => {
     }
 
     if (msg.type === "hello") {
+      // Prefer the client-supplied id so a client can recognize itself in the
+      // roster (and survive reconnects); fall back to the generated one.
+      if (typeof msg.id === "string" && msg.id) conn.id = msg.id;
       conn.roomId = msg.room;
       let room = rooms.get(msg.room);
       if (!room) {

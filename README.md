@@ -29,10 +29,15 @@ two people who open the same git repo land in the same room automatically.
 ### Message contract
 
 ```
-client -> server: { type: "hello",  name: string, room: string }
+client -> server: { type: "hello",  name: string, room: string, id?: string }
 client -> server: { type: "update", file: string }
 server -> client: { type: "roster", users: { id, name, file }[] }
 ```
+
+The client supplies its own `id` in `hello` so it can recognize itself in the
+roster (used to mark the `(you)` entry) regardless of display name; if omitted,
+the server assigns one. Matching on `id` instead of `name` means two teammates
+sharing a display name are still distinguished.
 
 ## Prerequisites
 
