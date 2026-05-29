@@ -1,5 +1,6 @@
 import { WebSocketServer, WebSocket } from "ws";
 import { randomUUID } from "node:crypto";
+import { networkInterfaces } from "node:os";
 
 /** A teammate as seen in a room roster. */
 interface User {
@@ -116,4 +117,19 @@ const heartbeat = setInterval(() => {
 
 wss.on("close", () => clearInterval(heartbeat));
 
-console.log(`presence relay listening on ws://localhost:${PORT}`);
+/** Non-internal IPv4 addresses, so teammates know what URL to point at. */
+function lanAddresses(): string[] {
+  const addrs: string[] = [];
+  for (const iface of Object.values(networkInterfaces())) {
+    for (const info of iface ?? []) {
+      if (info.family === "IPv4" && !info.internal) addrs.push(info.address);
+    }
+  }
+  return addrs;
+}
+
+console.log(`presence relay listening on:`);
+console.log(`  ws://localhost:${PORT}            (this machine)`);
+for (const ip of lanAddresses()) {
+  console.log(`  ws://${ip}:${PORT}        (give this to teammates on your LAN)`);
+}

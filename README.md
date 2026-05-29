@@ -68,6 +68,10 @@ PORT=9000 pnpm start
 `pnpm start` compiles the TypeScript and then runs the server. To rebuild on
 change while developing, use `cd server && pnpm dev`.
 
+On startup the relay prints every URL it's reachable at — `ws://localhost:8080`
+plus your LAN IP(s) — so you can copy the right `ws://<ip>:8080` straight into a
+teammate's `presence.serverUrl`.
+
 ## Run the extension (F5)
 
 1. Build the extension once (so the launch task has output to run):

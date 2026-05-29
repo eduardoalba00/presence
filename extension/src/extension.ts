@@ -139,6 +139,64 @@ class RosterProvider implements vscode.TreeDataProvider<User> {
 }
 
 // ---------------------------------------------------------------------------
+// File decorations: badge files in the Explorer with how many teammates (and,
+// on hover, who) currently have them open.
+// ---------------------------------------------------------------------------
+
+const normalizePath = (p: string): string => p.replace(/\\/g, "/");
+
+class PresenceDecorationProvider implements vscode.FileDecorationProvider {
+  // relative path (forward-slash) -> names of OTHER teammates on that file
+  private byPath = new Map<string, string[]>();
+  private decorated: vscode.Uri[] = [];
+  private readonly _onDidChange = new vscode.EventEmitter<vscode.Uri[]>();
+  readonly onDidChangeFileDecorations = this._onDidChange.event;
+
+  constructor(
+    private readonly folder: vscode.WorkspaceFolder | undefined,
+    private readonly myName: string
+  ) {}
+
+  setRoster(users: User[]): void {
+    const next = new Map<string, string[]>();
+    for (const u of users) {
+      if (!u.file || u.name === this.myName) continue; // skip empty + yourself
+      const key = normalizePath(u.file);
+      const names = next.get(key) ?? [];
+      names.push(u.name);
+      next.set(key, names);
+    }
+    this.byPath = next;
+
+    const nextUris = [...next.keys()]
+      .map((p) => this.toUri(p))
+      .filter((u): u is vscode.Uri => u !== undefined);
+    // Refresh files that gained AND lost presence since the last roster.
+    const changed = [...this.decorated, ...nextUris];
+    this.decorated = nextUris;
+    this._onDidChange.fire(changed);
+  }
+
+  provideFileDecoration(uri: vscode.Uri): vscode.FileDecoration | undefined {
+    if (!this.folder) return undefined;
+    const rel = normalizePath(vscode.workspace.asRelativePath(uri, false));
+    const names = this.byPath.get(rel);
+    if (!names?.length) return undefined;
+    return {
+      badge: names.length > 9 ? "9+" : String(names.length),
+      tooltip: `Presence: ${names.join(", ")}`,
+      color: new vscode.ThemeColor("charts.blue"),
+      propagate: true, // also tint parent folders so collapsed trees show it
+    };
+  }
+
+  private toUri(relPath: string): vscode.Uri | undefined {
+    if (!this.folder) return undefined;
+    return vscode.Uri.joinPath(this.folder.uri, ...relPath.split("/"));
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Helpers: display name and room id resolution.
 // ---------------------------------------------------------------------------
 
@@ -211,13 +269,16 @@ export async function activate(
   const room = await resolveRoomId(folder);
 
   const provider = new RosterProvider(name);
+  const decorations = new PresenceDecorationProvider(folder, name);
   context.subscriptions.push(
-    vscode.window.registerTreeDataProvider("presence.roster", provider)
+    vscode.window.registerTreeDataProvider("presence.roster", provider),
+    vscode.window.registerFileDecorationProvider(decorations)
   );
 
-  client = new PresenceClient(url, name, room, (users) =>
-    provider.setRoster(users)
-  );
+  client = new PresenceClient(url, name, room, (users) => {
+    provider.setRoster(users);
+    decorations.setRoster(users);
+  });
   client.start();
 
   // Report the file that's already open at startup.

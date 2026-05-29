@@ -4,7 +4,6 @@
   "private": true,
   "scripts": {
     "build": "pnpm -r build",
-    "start": "pnpm --filter @presence/server start",
-    "start:server": "pnpm --filter @presence/server start"
+    "start": "pnpm --filter @presence/server start"
   }
 }
