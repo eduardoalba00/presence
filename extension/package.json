@@ -2,7 +2,7 @@
   "name": "presence-extension",
   "displayName": "Presence",
   "description": "See which file each teammate currently has open, with shared read-only diffs and live comments.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "EduardoAlba",
   "private": true,
   "license": "MIT",
