@@ -1,9 +1,9 @@
 # Presence
 
 File-level presence for teammates. Each connected teammate can see which file
-every other teammate currently has open — nothing more. **This is presence
-only:** no code syncing, no edits, no cursor positions. Just "who is on what
-file."
+every other teammate currently has open, peek at their uncommitted changes,
+and leave live comments on them. **This is presence only:** no code syncing, no
+edits, no cursor positions.
 
 The project is a pnpm monorepo with three packages:
 
@@ -35,6 +35,11 @@ project references), so the message types are defined exactly once.
      file-type icons and `M`/`A`/`U`/`D` status letters.
    - **Explorer file decorations** — any file a teammate has open gets a
      2-letter initials badge and a colored tint; hover lists who's there.
+
+4. Open a teammate's diff and hover a line: the **+** in the gutter starts a
+   comment thread anchored to that line of their change. Threads and replies
+   show up live for everyone in the room, authors can edit or delete their own
+   comments, and everything vanishes when the room empties.
 
 Extra niceties:
 

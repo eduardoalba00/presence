@@ -1,7 +1,7 @@
 {
   "name": "presence-extension",
   "displayName": "Presence",
-  "description": "See which file each teammate currently has open, with shared read-only diffs.",
+  "description": "See which file each teammate currently has open, with shared read-only diffs and live comments.",
   "version": "0.2.0",
   "publisher": "EduardoAlba",
   "private": true,
@@ -30,7 +30,8 @@
     "awareness",
     "git",
     "diff",
-    "remote"
+    "remote",
+    "comments"
   ],
   "activationEvents": [
     "onStartupFinished"
@@ -110,6 +111,34 @@
         "title": "Retry Repository Access Check",
         "category": "Presence",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "presence.comment.reply",
+        "title": "Comment",
+        "category": "Presence",
+        "enablement": "!commentIsEmpty"
+      },
+      {
+        "command": "presence.comment.edit",
+        "title": "Edit Comment",
+        "category": "Presence",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "presence.comment.delete",
+        "title": "Delete Comment",
+        "category": "Presence",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "presence.comment.save",
+        "title": "Save",
+        "category": "Presence"
+      },
+      {
+        "command": "presence.comment.cancel",
+        "title": "Cancel",
+        "category": "Presence"
       }
     ],
     "menus": {
@@ -133,6 +162,59 @@
           "command": "presence.setServerUrl",
           "when": "view == presence.roster && !presence.accessDenied",
           "group": "navigation@2"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "presence.comment.reply",
+          "when": "false"
+        },
+        {
+          "command": "presence.comment.edit",
+          "when": "false"
+        },
+        {
+          "command": "presence.comment.delete",
+          "when": "false"
+        },
+        {
+          "command": "presence.comment.save",
+          "when": "false"
+        },
+        {
+          "command": "presence.comment.cancel",
+          "when": "false"
+        }
+      ],
+      "comments/commentThread/context": [
+        {
+          "command": "presence.comment.reply",
+          "group": "inline",
+          "when": "commentController == presence"
+        }
+      ],
+      "comments/comment/title": [
+        {
+          "command": "presence.comment.edit",
+          "group": "inline@1",
+          "when": "commentController == presence && comment == mine"
+        },
+        {
+          "command": "presence.comment.delete",
+          "group": "inline@2",
+          "when": "commentController == presence && comment == mine"
+        }
+      ],
+      "comments/comment/context": [
+        {
+          "command": "presence.comment.cancel",
+          "group": "inline@1",
+          "when": "commentController == presence && comment == mine"
+        },
+        {
+          "command": "presence.comment.save",
+          "group": "inline@2",
+          "when": "commentController == presence && comment == mine"
         }
       ]
     }

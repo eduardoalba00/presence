@@ -35,6 +35,14 @@ export const PAUSE_COMMAND = "presence.pause";
 export const RESUME_COMMAND = "presence.resume";
 export const SET_URL_COMMAND = "presence.setServerUrl";
 export const RETRY_ACCESS_COMMAND = "presence.retryAccess";
+export const COMMENT_REPLY_COMMAND = "presence.comment.reply";
+export const COMMENT_EDIT_COMMAND = "presence.comment.edit";
+export const COMMENT_SAVE_COMMAND = "presence.comment.save";
+export const COMMENT_CANCEL_COMMAND = "presence.comment.cancel";
+export const COMMENT_DELETE_COMMAND = "presence.comment.delete";
+
+/** Id of the comment controller (the `commentController` context key). */
+export const COMMENT_CONTROLLER_ID = "presence";
 
 /** Context keys driving the view's welcome content and title buttons. */
 export const PAUSED_CONTEXT = "presence.paused";

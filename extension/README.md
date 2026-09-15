@@ -1,7 +1,7 @@
 # Presence
 
-See which file each teammate currently has open — and peek at their uncommitted
-changes — right inside VS Code. **Presence only:** no code syncing, no edits to
+See which file each teammate currently has open, peek at their uncommitted
+changes, and comment on them live — right inside VS Code. **Presence only:** no code syncing, no edits to
 your files, no cursor positions. Just shared awareness of who's where.
 
 ## Install
@@ -26,6 +26,10 @@ your files, no cursor positions. Just shared awareness of who's where.
   changes (working tree + staged + untracked vs `HEAD`). Click a file to open it
   in VS Code's native **read-only diff editor**, with real file-type icons and
   `M`/`A`/`U`/`D` status letters — just like your own Source Control view.
+- **Live comments on diffs** — hover a line in a teammate's diff and click the
+  gutter **+** to start a thread. Replies appear instantly for everyone in the
+  room, you can edit or delete your own comments, and nothing is stored: threads
+  live only while the room does.
 - **Explorer badges** — any file a teammate has open gets an initials badge and
   a colored tint in the Explorer; hover to see who's there.
 - **Same-file collision** — when a teammate is editing the exact file you have
@@ -53,8 +57,10 @@ for TLS. The relay source lives in the
 
 ## Privacy
 
-While active, Presence shares your current file, git branch, and **uncommitted
-diff** with everyone connected to the same relay and repo. Use the **Pause**
+While active, Presence shares your current file, git branch, **uncommitted
+diff**, and any comments you leave with everyone connected to the same relay and
+repo. Comments are held in the relay's memory only and are discarded when the
+room empties. Use the **Pause**
 button (Teammates view title) whenever you don't want to share — it disconnects
 you until you resume, and the choice persists across sessions.
 

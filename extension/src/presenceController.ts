@@ -21,6 +21,7 @@ import { ActivityTracker } from "./activityTracker";
 import { PresenceClient, type ConnectionState } from "./presenceClient";
 import { DiffWatcher } from "./git/diffWatcher";
 import { AvatarCache } from "./ui/avatars";
+import { CommentSync } from "./ui/comments";
 import { RosterProvider, type RosterNode } from "./ui/rosterProvider";
 import { StatusBar } from "./ui/statusBar";
 import { DiffContentProvider, registerOpenDiffCommand } from "./ui/diffViewer";
@@ -51,6 +52,7 @@ export class PresenceController implements vscode.Disposable {
   private readonly provider: RosterProvider;
   private readonly explorerDecorations: ExplorerPresenceDecorations;
   private readonly diffContent: DiffContentProvider;
+  private readonly comments: CommentSync;
   private readonly statusBar: StatusBar;
   private readonly treeView: vscode.TreeView<RosterNode>;
 
@@ -81,8 +83,10 @@ export class PresenceController implements vscode.Disposable {
     this.client = new PresenceClient(url, id, name, room, {
       onRoster: (users) => this.onRoster(users),
       onDiffs: (entries) => this.onDiffs(entries),
+      onComments: (threads) => this.comments.setThreads(threads),
       onStatus: (state) => this.onStatus(state),
     });
+    this.comments = new CommentSync(id, (msg) => this.client.sendComment(msg));
     this.watcher = new DiffWatcher(
       folder,
       (files) => this.client.updateDiff(files),
@@ -165,6 +169,7 @@ export class PresenceController implements vscode.Disposable {
     this.collisions = new Set();
     this.provider.setRoster([]);
     this.provider.setDiffs(new Map());
+    this.comments.setThreads([]);
     this.explorerDecorations.setRoster([]);
     this.statusBar.setPaused(true);
     this.treeView.message = undefined;
@@ -178,6 +183,7 @@ export class PresenceController implements vscode.Disposable {
     this.collisions = new Set();
     this.provider.setRoster([]);
     this.provider.setDiffs(new Map());
+    this.comments.setThreads([]);
     this.explorerDecorations.setRoster([]);
     this.statusBar.setAccessDenied(true);
     this.treeView.message = undefined; // the welcome view explains the state
@@ -224,6 +230,7 @@ export class PresenceController implements vscode.Disposable {
     this.disposables.push(
       this.treeView,
       this.statusBar,
+      this.comments,
       vscode.window.registerFileDecorationProvider(this.explorerDecorations),
       vscode.window.registerFileDecorationProvider(new DiffStatusDecorations()),
       vscode.window.registerFileDecorationProvider(new CollisionDecorations()),
@@ -271,6 +278,7 @@ export class PresenceController implements vscode.Disposable {
     const byUser = new Map(entries.map((e) => [e.id, e.files]));
     this.provider.setDiffs(byUser);
     this.diffContent.update(byUser);
+    this.comments.setDiffs(byUser);
   }
 
   private onStatus(state: ConnectionState): void {
