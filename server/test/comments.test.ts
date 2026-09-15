@@ -75,23 +75,29 @@ describe("applyCommentOp add", () => {
       commentId: "c1",
       body: "hi",
     };
-    expect(applyCommentOp(store, alice, noAnchor)).toBe(false);
+    const noAnchorChanged = applyCommentOp(store, alice, noAnchor);
+    expect(noAnchorChanged).toBe(false);
     const badLine = add("t1", "c1", "hi", { ...anchor, line: -1 });
-    expect(applyCommentOp(store, alice, badLine)).toBe(false);
+    const badLineChanged = applyCommentOp(store, alice, badLine);
+    expect(badLineChanged).toBe(false);
     const badSide = { ...anchor, side: "middle" } as unknown as CommentAnchor;
     const badSideMsg = add("t1", "c1", "hi", badSide);
-    expect(applyCommentOp(store, alice, badSideMsg)).toBe(false);
+    const badSideMsgChanged = applyCommentOp(store, alice, badSideMsg);
+    expect(badSideMsgChanged).toBe(false);
     expect(store.size).toBe(0);
   });
 
   it("rejects blank, oversized, and non-string bodies", () => {
     const store: CommentStore = new Map();
     const blank = add("t1", "c1", "   ");
-    expect(applyCommentOp(store, alice, blank)).toBe(false);
+    const blankChanged = applyCommentOp(store, alice, blank);
+    expect(blankChanged).toBe(false);
     const huge = add("t1", "c1", "x".repeat(MAX_COMMENT_CHARS + 1));
-    expect(applyCommentOp(store, alice, huge)).toBe(false);
+    const hugeChanged = applyCommentOp(store, alice, huge);
+    expect(hugeChanged).toBe(false);
     const notString = add("t1", "c1", 42 as unknown as string);
-    expect(applyCommentOp(store, alice, notString)).toBe(false);
+    const notStringChanged = applyCommentOp(store, alice, notString);
+    expect(notStringChanged).toBe(false);
     expect(store.size).toBe(0);
   });
 
@@ -99,22 +105,27 @@ describe("applyCommentOp add", () => {
     const store: CommentStore = new Map();
     const padded = add("t1", "c1", "  hello \n");
     applyCommentOp(store, alice, padded);
-    expect(store.get("t1")?.comments[0].body).toBe("hello");
+    const thread = store.get("t1");
+    expect(thread?.comments[0].body).toBe("hello");
   });
 
   it("rejects a duplicate comment id within a thread", () => {
     const store = seeded();
     const dup = add("t1", "c1", "again");
-    expect(applyCommentOp(store, alice, dup)).toBe(false);
-    expect(store.get("t1")?.comments).toHaveLength(1);
+    const dupChanged = applyCommentOp(store, alice, dup);
+    expect(dupChanged).toBe(false);
+    const thread = store.get("t1");
+    expect(thread?.comments).toHaveLength(1);
   });
 
   it("rejects empty ids", () => {
     const store: CommentStore = new Map();
     const noThread = add("", "c1", "hi");
-    expect(applyCommentOp(store, alice, noThread)).toBe(false);
+    const noThreadChanged = applyCommentOp(store, alice, noThread);
+    expect(noThreadChanged).toBe(false);
     const noComment = add("t1", "", "hi");
-    expect(applyCommentOp(store, alice, noComment)).toBe(false);
+    const noCommentChanged = applyCommentOp(store, alice, noComment);
+    expect(noCommentChanged).toBe(false);
   });
 });
 
@@ -128,8 +139,10 @@ describe("applyCommentOp edit", () => {
       commentId: "c1",
       body: "never mind",
     };
-    expect(applyCommentOp(store, alice, edit)).toBe(true);
-    expect(store.get("t1")?.comments[0].body).toBe("never mind");
+    const editChanged = applyCommentOp(store, alice, edit);
+    expect(editChanged).toBe(true);
+    const thread = store.get("t1");
+    expect(thread?.comments[0].body).toBe("never mind");
   });
 
   it("refuses edits from anyone else", () => {
@@ -141,8 +154,10 @@ describe("applyCommentOp edit", () => {
       commentId: "c1",
       body: "hijacked",
     };
-    expect(applyCommentOp(store, bob, edit)).toBe(false);
-    expect(store.get("t1")?.comments[0].body).toBe("looks wrong");
+    const editChanged = applyCommentOp(store, bob, edit);
+    expect(editChanged).toBe(false);
+    const thread = store.get("t1");
+    expect(thread?.comments[0].body).toBe("looks wrong");
   });
 
   it("ignores unknown threads and comments", () => {
@@ -154,7 +169,8 @@ describe("applyCommentOp edit", () => {
       commentId: "c1",
       body: "x",
     };
-    expect(applyCommentOp(store, alice, missingThread)).toBe(false);
+    const missingThreadChanged = applyCommentOp(store, alice, missingThread);
+    expect(missingThreadChanged).toBe(false);
     const missingComment: CommentMessage = {
       type: "comment",
       op: "edit",
@@ -162,7 +178,8 @@ describe("applyCommentOp edit", () => {
       commentId: "nope",
       body: "x",
     };
-    expect(applyCommentOp(store, alice, missingComment)).toBe(false);
+    const missingCommentChanged = applyCommentOp(store, alice, missingComment);
+    expect(missingCommentChanged).toBe(false);
   });
 });
 
@@ -175,8 +192,10 @@ describe("applyCommentOp delete", () => {
       threadId: "t1",
       commentId: "c1",
     };
-    expect(applyCommentOp(store, alice, del)).toBe(true);
-    expect(store.has("t1")).toBe(false);
+    const delChanged = applyCommentOp(store, alice, del);
+    expect(delChanged).toBe(true);
+    const kept = store.has("t1");
+    expect(kept).toBe(false);
   });
 
   it("keeps the thread when other comments remain", () => {
@@ -202,7 +221,9 @@ describe("applyCommentOp delete", () => {
       threadId: "t1",
       commentId: "c1",
     };
-    expect(applyCommentOp(store, bob, del)).toBe(false);
-    expect(store.get("t1")?.comments).toHaveLength(1);
+    const delChanged = applyCommentOp(store, bob, del);
+    expect(delChanged).toBe(false);
+    const thread = store.get("t1");
+    expect(thread?.comments).toHaveLength(1);
   });
 });
