@@ -1,6 +1,8 @@
 import WebSocket from "ws";
 import type {
   ClientMessage,
+  CommentMessage,
+  CommentThread,
   DiffEntry,
   DiffFile,
   PresenceStatus,
@@ -15,6 +17,7 @@ export type ConnectionState = "connecting" | "connected" | "reconnecting";
 export interface PresenceClientHandlers {
   onRoster(users: User[]): void;
   onDiffs(entries: DiffEntry[]): void;
+  onComments(threads: CommentThread[]): void;
   onStatus(state: ConnectionState): void;
 }
 
@@ -99,6 +102,11 @@ export class PresenceClient {
     this.send({ type: "diff", files });
   }
 
+  /** Fire-and-forget: comment state lives on the relay, not here. */
+  sendComment(msg: CommentMessage): void {
+    this.send(msg);
+  }
+
   dispose(): void {
     this.disposed = true;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
@@ -141,6 +149,8 @@ export class PresenceClient {
       this.handlers.onRoster(msg.users);
     } else if (msg.type === "diffs" && Array.isArray(msg.entries)) {
       this.handlers.onDiffs(msg.entries);
+    } else if (msg.type === "comments" && Array.isArray(msg.threads)) {
+      this.handlers.onComments(msg.threads);
     }
   }
 

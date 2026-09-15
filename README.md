@@ -1,9 +1,9 @@
 # Presence
 
 File-level presence for teammates. Each connected teammate can see which file
-every other teammate currently has open — nothing more. **This is presence
-only:** no code syncing, no edits, no cursor positions. Just "who is on what
-file."
+every other teammate currently has open, peek at their uncommitted changes,
+and leave live comments on them. **This is presence only:** no code syncing, no
+edits, no cursor positions.
 
 The project is a pnpm monorepo with three packages:
 
@@ -35,6 +35,11 @@ project references), so the message types are defined exactly once.
      file-type icons and `M`/`A`/`U`/`D` status letters.
    - **Explorer file decorations** — any file a teammate has open gets a
      2-letter initials badge and a colored tint; hover lists who's there.
+
+4. Open a teammate's diff and hover a line: the **+** in the gutter starts a
+   comment thread anchored to that line of their change. Threads and replies
+   show up live for everyone in the room, authors can edit or delete their own
+   comments, and everything vanishes when the room empties.
 
 Extra niceties:
 
@@ -71,12 +76,18 @@ two people who open the same git repo land in the same room automatically.
 client -> server: { type: "hello",  name: string, room: string, id?: string }
 client -> server: { type: "update", file?, branch?, status? }   // partial; merged
 client -> server: { type: "diff",   files: DiffFile[] }
+client -> server: { type: "comment", op: "add",    threadId, commentId, body, anchor? }
+client -> server: { type: "comment", op: "edit",   threadId, commentId, body }
+client -> server: { type: "comment", op: "delete", threadId, commentId }
 server -> client: { type: "roster", users: User[] }
 server -> client: { type: "diffs",  entries: { id, files: DiffFile[] }[] }
+server -> client: { type: "comments", threads: CommentThread[] }
 
 User     = { id, name, file, branch, status: "active"|"idle" }
 DiffFile = { path, status: "added"|"modified"|"deleted"|"untracked"|"binary"|"large",
              before, after }   // before = HEAD content, after = working content
+CommentThread = { id, anchor: { ownerId, path, side: "before"|"after", line }, comments: Comment[] }
+Comment       = { id, authorId, authorName, body, createdAt }
 ```
 
 `update` is a partial: the server merges whichever of `file`/`branch`/`status`
@@ -92,6 +103,15 @@ on a debounced cadence, file switches are instant). The relay treats `DiffFile`
 as opaque — it only stores and echoes. `before`/`after` carry both sides of each
 change so a teammate's diff can render in your editor without you having their
 files.
+
+Comments are a third stream. A thread is anchored to one line of one teammate's
+shared diff (`anchor.ownerId` is that teammate). `add` with a new `threadId`
+creates the thread, so `anchor` is required then; replies to an existing thread
+omit it. The relay stamps `authorId`/`authorName` from the sender's `hello` and
+only lets the author edit or delete their own comment; deleting the last
+comment removes the thread. Threads live as long as the room does: they survive
+their author (and the diff owner) disconnecting, and vanish when the room
+empties. Nothing is persisted.
 
 ## Prerequisites
 

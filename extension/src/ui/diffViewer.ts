@@ -1,9 +1,7 @@
 import * as vscode from "vscode";
-import type { DiffFile } from "@presence/protocol";
+import type { DiffFile, DiffSide } from "@presence/protocol";
 import { DIFF_SCHEME, OPEN_DIFF_COMMAND } from "../constants";
 import { queryParam } from "../util/paths";
-
-type DiffSide = "before" | "after";
 
 /** `presence-diff://<userId>/<repo-relative-path>?side=before|after` */
 export function diffUri(
@@ -17,6 +15,18 @@ export function diffUri(
     path: "/" + path,
     query: `side=${side}`,
   });
+}
+
+/** The inverse of {@link diffUri}; undefined for any other scheme or side. */
+export function parseDiffUri(
+  uri: vscode.Uri,
+): { ownerId: string; path: string; side: DiffSide } | undefined {
+  if (uri.scheme !== DIFF_SCHEME) return undefined;
+  const side = queryParam(uri, "side");
+  if (side !== "before" && side !== "after") return undefined;
+  const decoded = decodeURIComponent(uri.path);
+  const path = decoded.replace(/^\//, "");
+  return { ownerId: uri.authority, path, side };
 }
 
 /**
@@ -37,13 +47,13 @@ export class DiffContentProvider implements vscode.TextDocumentContentProvider {
 
   provideTextDocumentContent(uri: vscode.Uri): string {
     this.served.add(uri.toString());
-    const side = queryParam(uri, "side");
-    const path = decodeURIComponent(uri.path).replace(/^\//, "");
+    const parsed = parseDiffUri(uri);
+    if (!parsed) return "";
     const file = this.diffsByUser
-      .get(uri.authority)
-      ?.find((f) => f.path === path);
+      .get(parsed.ownerId)
+      ?.find((f) => f.path === parsed.path);
     if (!file) return "";
-    return side === "before" ? file.before : file.after;
+    return parsed.side === "before" ? file.before : file.after;
   }
 }
 

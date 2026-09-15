@@ -48,11 +48,66 @@ export interface DiffEntry {
   files: DiffFile[];
 }
 
+/** Which side of a shared diff a comment thread is anchored to. */
+export type DiffSide = "before" | "after";
+
+/** Where a thread lives: one line on one side of one teammate's shared diff. */
+export interface CommentAnchor {
+  /** Id of the teammate whose diff this is. */
+  ownerId: string;
+  /** Repo-relative path within that diff. */
+  path: string;
+  side: DiffSide;
+  /** Zero-based line number on that side. */
+  line: number;
+}
+
+/** A single comment. Author and timestamp are stamped by the relay. */
+export interface Comment {
+  id: string;
+  authorId: string;
+  authorName: string;
+  body: string;
+  /** Epoch milliseconds. */
+  createdAt: number;
+}
+
+/** A thread of comments on a diff line. Lives as long as the room does. */
+export interface CommentThread {
+  id: string;
+  anchor: CommentAnchor;
+  comments: Comment[];
+}
+
+/**
+ * Comment operations. `add` creates the thread when `threadId` is new, so
+ * `anchor` is required then and ignored otherwise. Only the author may edit
+ * or delete a comment; deleting the last comment removes its thread.
+ */
+export type CommentMessage =
+  | {
+      type: "comment";
+      op: "add";
+      threadId: string;
+      commentId: string;
+      body: string;
+      anchor?: CommentAnchor;
+    }
+  | {
+      type: "comment";
+      op: "edit";
+      threadId: string;
+      commentId: string;
+      body: string;
+    }
+  | { type: "comment"; op: "delete"; threadId: string; commentId: string };
+
 /** Messages a client sends to the relay. */
 export type ClientMessage =
   | { type: "hello"; id?: string; name: string; room: string }
   | { type: "update"; file?: string; branch?: string; status?: PresenceStatus }
-  | { type: "diff"; files: DiffFile[] };
+  | { type: "diff"; files: DiffFile[] }
+  | CommentMessage;
 
 /** Roster broadcast: everyone currently in the room. */
 export interface RosterMessage {
@@ -66,5 +121,11 @@ export interface DiffsMessage {
   entries: DiffEntry[];
 }
 
+/** Comments broadcast: every thread in the room. */
+export interface CommentsMessage {
+  type: "comments";
+  threads: CommentThread[];
+}
+
 /** Messages the relay sends to clients. */
-export type ServerMessage = RosterMessage | DiffsMessage;
+export type ServerMessage = RosterMessage | DiffsMessage | CommentsMessage;
