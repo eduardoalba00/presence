@@ -140,22 +140,27 @@ export class CommentSync implements vscode.Disposable {
   }
 
   private upsert(source: CommentThread): void {
+    const comments = source.comments.map(
+      (c) => new PresenceComment(c.id, source.id, c, c.authorId === this.myId),
+    );
     let thread = this.threads.get(source.id);
     if (!thread) {
       const { ownerId, path, side, line } = source.anchor;
       const uri = diffUri(ownerId, path, side);
       const range = new vscode.Range(line, 0, line, 0);
-      thread = this.controller.createCommentThread(uri, range, []);
+      thread = this.controller.createCommentThread(uri, range, comments);
       thread.canReply = true;
+      // Threads we create start with no collapse state, which VS Code renders
+      // as a bare gutter glyph; expand so viewers see them like the author does.
+      thread.collapsibleState = vscode.CommentThreadCollapsibleState.Expanded;
       this.threads.set(source.id, thread);
+      return;
     }
     // Don't yank a comment out from under someone mid-edit; the thread is
     // re-rendered once they save or cancel.
     const editing = isEditing(thread);
     if (editing) return;
-    thread.comments = source.comments.map(
-      (c) => new PresenceComment(c.id, source.id, c, c.authorId === this.myId),
-    );
+    thread.comments = comments;
   }
 
   // --- commands ------------------------------------------------------------
