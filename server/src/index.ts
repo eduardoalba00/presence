@@ -3,11 +3,13 @@ import { randomUUID } from "node:crypto";
 import { networkInterfaces } from "node:os";
 import type {
   ClientMessage,
+  CommentsMessage,
   DiffFile,
   DiffsMessage,
   RosterMessage,
   User,
 } from "@presence/protocol";
+import { applyCommentOp, type CommentStore } from "./comments";
 
 /** A live socket, annotated with the bits of state we track per connection. */
 interface Conn extends WebSocket {
@@ -24,14 +26,17 @@ const rooms = new Map<string, Map<string, User>>();
 // roomId -> (connectionId -> their changed files). Independent of the roster
 // because diffs change on a different (debounced) cadence than file switches.
 const diffs = new Map<string, Map<string, DiffFile[]>>();
+// roomId -> comment threads. Threads outlive their authors (and the diff
+// owner) and are dropped only when the room empties.
+const comments = new Map<string, CommentStore>();
 
 const wss = new WebSocketServer({ port: PORT });
 
 /**
  * Timestamped console line. We log lifecycle events (connects, joins, leaves,
- * room churn) and a bare signal that updates/diffs arrived — never their
- * contents (file paths, branches, diff bodies), keeping the relay's
- * in-memory, low-PII posture intact.
+ * room churn) and a bare signal that updates/diffs/comments arrived — never
+ * their contents (file paths, branches, diff or comment bodies), keeping the
+ * relay's in-memory, low-PII posture intact.
  */
 function log(msg: string): void {
   console.log(`${new Date().toISOString()} ${msg}`);
@@ -76,6 +81,15 @@ function broadcastDiffs(roomId: string): void {
   sendToRoom(roomId, JSON.stringify(msg));
 }
 
+/** Send every comment thread in `roomId` to everyone in that room. */
+function broadcastComments(roomId: string): void {
+  const store = comments.get(roomId);
+  const threads = store ? [...store.values()] : [];
+  const msg: CommentsMessage = { type: "comments", threads };
+  const data = JSON.stringify(msg);
+  sendToRoom(roomId, data);
+}
+
 wss.on("connection", (socket) => {
   const conn = socket as Conn;
   conn.id = randomUUID();
@@ -115,8 +129,9 @@ wss.on("connection", (socket) => {
         status: "active",
       });
       broadcast(msg.room);
-      // Hand the newcomer everyone's current diffs (and vice-versa).
+      // Hand the newcomer everyone's diffs and comments (and vice-versa).
       broadcastDiffs(msg.room);
+      broadcastComments(msg.room);
     } else if (msg.type === "update") {
       if (!conn.roomId) return; // update before hello — ignore
       const user = rooms.get(conn.roomId)?.get(conn.id);
@@ -141,6 +156,20 @@ wss.on("connection", (socket) => {
       room.set(conn.id, files);
       log(`diff from ${label(conn)} in ${conn.roomId} (${files.length} files)`);
       broadcastDiffs(conn.roomId);
+    } else if (msg.type === "comment") {
+      if (!conn.roomId) return; // comment before hello — ignore
+      const author = rooms.get(conn.roomId)?.get(conn.id);
+      if (!author) return;
+      let store = comments.get(conn.roomId);
+      if (!store) {
+        store = new Map();
+        comments.set(conn.roomId, store);
+      }
+      const changed = applyCommentOp(store, author, msg);
+      if (!changed) return;
+      const who = label(conn);
+      log(`comment ${msg.op} from ${who} in ${conn.roomId}`);
+      broadcastComments(conn.roomId);
     }
   });
 
@@ -155,6 +184,7 @@ wss.on("connection", (socket) => {
       log(`${who} left room ${conn.roomId}`);
       if (room.size === 0) {
         rooms.delete(conn.roomId);
+        comments.delete(conn.roomId);
         log(`room emptied (${conn.roomId})`);
       } else broadcast(conn.roomId);
     }
